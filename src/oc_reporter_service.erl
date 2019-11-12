@@ -20,6 +20,12 @@
 
 -behaviour(oc_reporter).
 
+-define(DEFAULT_ENDPOINTS, [{<<"localhost">>, 9092}]).
+-define(DEFAULT_TOPIC, <<"opencensus-spans">>).
+-define(DEFAULT_KAFKA_CLIENT_ID, opencensus_spans_client).
+-define(DEFAULT_PRODUCER_CONFIG, []).
+-define(DEFAULT_PARTITIONER, random).
+
 -include_lib("opencensus/include/opencensus.hrl").
 
 -export([init/1,
@@ -27,22 +33,25 @@
 
 -export([to_oc_proto/1]).
 
+-record(state, {client_id, topic, partitioner}).
+
 init(Opts) ->
     %% in case this is called before the app has booted
     _ = application:ensure_all_started(opencensus_service),
-    ChannelName = maps:get(channel_name, Opts, channel_service),
-    Name = list_to_atom(atom_to_list(ChannelName) ++ "_client_stream"),
-    Endpoints = maps:get(endpoints, Opts, [{http, "localhost", 55678, []}]),
-    Options = maps:get(options, Opts, #{}),
-    SupFlags = maps:get(sup_flags, Opts, #{strategy => one_for_one,
+    Endpoints = kafka_endpoints(Opts),
+    Topic = kafka_topic(Opts),
+    ClientId = kafka_client_id(Opts),
+    ProducerConfig = kafka_producer_config(Opts),
+    Partitioner = kafka_partitioner(Opts),
+    SupFlags = proplists:get_value(sup_flags, Opts, #{strategy => one_for_one,
                                            intensity => 1,
                                            period => 5}),
-    opencensus_service_sup:start_child(Name, ChannelName, Endpoints, Options, SupFlags),
-    Name.
+    opencensus_service_sup:start_child(Endpoints, Topic, ClientId, ProducerConfig, SupFlags),
+     #state{client_id = ClientId, topic = Topic, partitioner = Partitioner}.
 
-report(Spans, Name) ->
+report(Spans, #state{client_id = ClientId, topic = Topic, partitioner = Partitioner}) ->
     ProtoSpans = [to_oc_proto(Span) || Span <- Spans],
-    oc_reporter_client:report_spans(Name, ProtoSpans),
+    oc_reporter_kafka_client:report_spans(ProtoSpans, ClientId, Topic, Partitioner),
     ok.
 
 to_oc_proto(#message_event{type=Type,
@@ -181,4 +190,19 @@ trunc_string(V) when is_list(V) ->
 trunc_string(V) when is_binary(V) ->
     #{value => V,
       truncated_byte_count => 0}.
+
+kafka_endpoints(Options) ->
+  proplists:get_value(kafka_endpoints, Options, ?DEFAULT_ENDPOINTS).
+
+kafka_topic(Options) ->
+  proplists:get_value(kafka_topic, Options, ?DEFAULT_TOPIC).
+
+kafka_client_id(Options) ->
+  proplists:get_value(kafka_client_id, Options, ?DEFAULT_KAFKA_CLIENT_ID).
+
+kafka_producer_config(Options) ->
+  proplists:get_value(kafka_producer_config, Options, ?DEFAULT_PRODUCER_CONFIG).
+
+kafka_partitioner(Options) ->
+  proplists:get_value(kafka_partitioner, Options, ?DEFAULT_PARTITIONER).
 

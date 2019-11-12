@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
-%% this module was generated on 2019-02-07T00:47:39+00:00 and should not be modified manually
+%% this module was generated on 2019-11-04T12:07:35+00:00 and should not be modified manually
 
 -module(oc_metrics_client).
 

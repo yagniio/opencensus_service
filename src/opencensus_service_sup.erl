@@ -17,14 +17,15 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-start_child(Name, ChannelName, Endpoints, Options, SupFlags) ->
-    supervisor:start_child(?SERVER, [Name, ChannelName, Endpoints, Options, SupFlags]).
+start_child(Endpoints, Topic, ClientId, ProducerConfig, SupFlags) ->
+    supervisor:start_child(?SERVER, [Endpoints, Topic, ClientId, ProducerConfig, SupFlags]).
 
 init([]) ->
     SupFlags = #{strategy => simple_one_for_one,
                  intensity => 5,
                  period => 10},
-    ChildSpec = #{id => oc_service_client_sup,
-                  start => {oc_service_client_sup, start_link, []},
-                  shutdown => 1000},
+
+    ChildSpec = #{id => oc_service_kafka_client_sup,
+                   start => {oc_service_kafka_client_sup, start_link, []}},
+
     {ok, {SupFlags, [ChildSpec]}}.
