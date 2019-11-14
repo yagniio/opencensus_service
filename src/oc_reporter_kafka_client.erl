@@ -25,6 +25,7 @@ parse_bootstrap_servers(Endpoints) when is_binary(Endpoints) ->
   Urls = string:split(Endpoints, ","),
   lists:map(fun(Url) -> 
     [Host, Port] = string:split(Url, ":"),
-    {unicode:characters_to_list(Host), string:to_integer(Port)}
+    {IPort, _Rest} = string:to_integer(Port),
+    {unicode:characters_to_list(Host), IPort}
   end, Urls);
 parse_bootstrap_servers(Endpoints) -> Endpoints.
