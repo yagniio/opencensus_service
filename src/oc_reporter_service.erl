@@ -33,7 +33,7 @@
 
 -export([to_oc_proto/1]).
 
--record(state, {client_id, topic, partitioner}).
+-record(state, {client_id, topic, partitioner, headers}).
 
 init(Opts) ->
     %% in case this is called before the app has booted
@@ -43,15 +43,16 @@ init(Opts) ->
     ClientId = kafka_client_id(Opts),
     ProducerConfig = kafka_producer_config(Opts),
     Partitioner = kafka_partitioner(Opts),
+    Headers = kafka_headers(Opts),
     SupFlags = proplists:get_value(sup_flags, Opts, #{strategy => one_for_one,
                                            intensity => 1,
                                            period => 5}),
     opencensus_service_sup:start_child(Endpoints, Topic, ClientId, ProducerConfig, SupFlags),
-     #state{client_id = ClientId, topic = Topic, partitioner = Partitioner}.
+     #state{client_id = ClientId, topic = Topic, partitioner = Partitioner, headers = Headers}.
 
-report(Spans, #state{client_id = ClientId, topic = Topic, partitioner = Partitioner}) ->
+report(Spans, #state{client_id = ClientId, topic = Topic, partitioner = Partitioner, headers = Headers}) ->
     ProtoSpans = [to_oc_proto(Span) || Span <- Spans],
-    oc_reporter_kafka_client:report_spans(ProtoSpans, ClientId, Topic, Partitioner),
+    oc_reporter_kafka_client:report_spans(ProtoSpans, ClientId, Topic, Partitioner, Headers),
     ok.
 
 to_oc_proto(#message_event{type=Type,
@@ -205,4 +206,7 @@ kafka_producer_config(Options) ->
 
 kafka_partitioner(Options) ->
   proplists:get_value(kafka_partitioner, Options, ?DEFAULT_PARTITIONER).
+
+kafka_headers(Options) ->
+  proplists:get_value(kafka_headers, Options).
 

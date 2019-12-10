@@ -1,7 +1,7 @@
 -module(oc_reporter_kafka_client).
 
 -export([start_link/4,
-         report_spans/4]).
+         report_spans/5]).
 
 -ifdef(OTP_RELEASE).
 -include_lib("kernel/include/logger.hrl").
@@ -15,11 +15,18 @@ start_link(Endpoints, Topic, ClientId, ProducerConfig) ->
     ok = brod:start_producer(ClientId, Topic, ProducerConfig),
     {ok, []}.
 
-report_spans(Spans, ClientId, Topic, Partitioner) ->
+report_spans(Spans, ClientId, Topic, Partitioner, Headers) ->
     [FirstSpan|_rest] = Spans,
     TraceId = maps:get(trace_id,FirstSpan),
     Encoded = dump_pb:encode_msg(#{spans => Spans}, dump_spans),
-    {ok, _FirstOffset} = brod:produce_sync_offset(ClientId, Topic, Partitioner, TraceId, Encoded).
+    HeadersParsed = case Headers of
+      {Module, Fun} -> erlang:apply(Module, Fun, []);
+      nil -> [];
+      _Else -> []
+    end,
+    Msg = #{ts => brod_utils:epoch_ms(), value => Encoded, headers => HeadersParsed},
+    {ok, _FirstOffset} = brod:produce_sync_offset(ClientId, Topic, Partitioner, TraceId, Msg).
+    % {ok, _FirstOffset} = brod:produce_sync_offset(ClientId, Topic, Partitioner, TraceId, Encoded).
 
 parse_bootstrap_servers(Endpoints) when is_binary(Endpoints) -> 
   Urls = string:split(Endpoints, ","),
